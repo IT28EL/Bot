@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>منصّة بوت الرّاسِخون</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<style>
+* { font-family: 'Tajawal', sans-serif; }
+body {
+background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+min-height: 100vh; overflow-x: hidden;
+}
+.glass {
+background: rgba(255,255,255,0.05);
+backdrop-filter: blur(16px);
+border: 1px solid rgba(255,255,255,0.1);
+}
+.glass-strong {
+background: rgba(255,255,255,0.1);
+backdrop-filter: blur(20px);
+border: 1px solid rgba(255,255,255,0.2);
+}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+.bg-orb {
+position: fixed; border-radius: 50%; filter: blur(80px);
+opacity: 0.15; pointer-events: none; z-index: 0;
+}
+.orb-1 { width: 400px; height: 400px; background: #3b82f6; top: -100px; right: -100px; animation: float 8s ease-in-out infinite; }
+.orb-2 { width: 300px; height: 300px; background: #8b5cf6; bottom: -50px; left: -50px; animation: float 10s ease-in-out infinite reverse; }
+.orb-3 { width: 250px; height: 250px; background: #06b6d4; top: 50%; left: 50%; animation: float 12s ease-in-out infinite 2s; }
+@keyframes float {
+0%, 100% { transform: translateY(0); }
+50% { transform: translateY(-20px); }
+}
+.task-item {
+transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+cursor: grab;
+}
+.task-item:active { cursor: grabbing; }
+.task-item:hover { transform: translateX(-5px); background: rgba(255,255,255,0.08); }
+.task-item.dragging { opacity: 0.5; transform: scale(1.02); }
+.custom-checkbox {
+appearance: none; width: 22px; height: 22px;
+border: 2px solid rgba(255,255,255,0.3); border-radius: 6px;
+cursor: pointer; position: relative; transition: all 0.3s;
+}
+.custom-checkbox:checked {
+background: #10b981; border-color: #10b981;
+}
+.custom-checkbox:checked::after {
+content: '✓'; position: absolute; color: white; font-size: 14px;
+top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.priority-high { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.priority-medium { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.priority-low { background: linear-gradient(135deg, #10b981, #059669); }
+#examMap { height: 400px; border-radius: 16px; z-index: 1; }
+.nav-item { position: relative; transition: all 0.3s; }
+.nav-item::after {
+content: ''; position: absolute; bottom: -4px; right: 0;
+width: 0; height: 3px;
+background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+border-radius: 2px; transition: width 0.3s;
+}
+.nav-item.active::after { width: 100%; }
+.nav-item.active { color: #60a5fa; }
+.modal-overlay {
+background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+}
+.bot-card {
+transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bot-card:hover {
+transform: translateY(-8px) scale(1.02);
+box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+.date-glow { text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+.telegram-btn { animation: telegramPulse 2s infinite; }
+@keyframes telegramPulse {
+0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+50% { box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }
+}
+.section-content { animation: slideUp 0.5s ease-out; }
+@keyframes slideUp {
+0% { transform: translateY(20px); opacity: 0; }
+100% { transform: translateY(0); opacity: 1; }
+}
+.glass-input:focus {
+background: rgba(255,255,255,0.12);
+border-color: rgba(59, 130, 246, 0.5);
+box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.toast {
+transform: translateX(150%);
+transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+.toast.show { transform: translateX(0); }
+.admin-badge {
+background: linear-gradient(135deg, #f59e0b, #ef4444);
+font-size: 10px;
+padding: 2px 10px;
+border-radius: 20px;
+margin-right: 6px;
+}
+</style>
+</head>
+<body class="text-white">
+<div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+<div class="bg-orb orb-3"></div>
+
+<nav class="fixed top-0 w-full z-50 glass-strong border-b border-white/10">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex items-center justify-between h-16">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+<i class="fas fa-graduation-cap text-lg"></i>
+</div>
+<span class="font-bold text-xl tracking-wide">منصّة بوت الرّاسِخون</span>
+<span id="adminBadge" class="admin-badge hidden">مشرف</span>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<button onclick="showSection('dashboard')" class="nav-item active px-3 py-2 text-sm font-medium" id="nav-dashboard">
+<i class="fas fa-home ml-2"></i>الرئيسية
+</button>
+<button onclick="showSection('tasks')" class="nav-item px-3 py-2 text-sm font-medium" id="nav-tasks">
+<i class="fas fa-tasks ml-2"></i>المهام
+</button>
+<button onclick="showSection('bot')" class="nav-item px-3 py-2 text-sm font-medium" id="nav-bot">
+<i class="fab fa-telegram ml-2"></i>محتوى البوت
+</button>
+<button onclick="showSection('calendar')" class="nav-item px-3 py-2 text-sm font-medium" id="nav-calendar">
+<i class="fas fa-calendar-alt ml-2"></i>التقويم
+</button>
+<button onclick="showSection('exam')" class="nav-item px-3 py-2 text-sm font-medium" id="nav-exam">
+<i class="fas fa-map-marker-alt ml-2"></i>موقع الامتحان
+</button>
+<button id="adminToggleBtn" onclick="toggleAdminMode()" class="nav-item px-3 py-2 text-sm font-medium text-amber-400">
+<i class="fas fa-user-cog ml-2"></i>وضع المشرف
+</button>
+</div>
+<div class="flex items-center gap-3">
+<button id="telegramConnectBtn" onclick="connectTelegram()" class="telegram-btn bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:scale-105 transition-transform hidden">
+<i class="fab fa-telegram text-lg"></i>
+<span class="hidden sm:inline">ربط البوت</span>
+</button>
+<button class="md:hidden glass p-2 rounded-lg" onclick="toggleMobileMenu()">
+<i class="fas fa-bars"></i>
+</button>
+</div>
+</div>
+</div>
+<div id="mobileMenu" class="hidden md:hidden glass-strong border-t border-white/10">
+<div class="px-4 py-3 space-y-2">
+<button onclick="showSection('dashboard')" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition">
+<i class="fas fa-home ml-2"></i>الرئيسية
+</button>
+<button onclick="showSection('tasks')" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition">
+<i class="fas fa-tasks ml-2"></i>المهام
+</button>
+<button onclick="showSection('bot')" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition">
+<i class="fab fa-telegram ml-2"></i>محتوى البوت
+</button>
+<button onclick="showSection('calendar')" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition">
+<i class="fas fa-calendar-alt ml-2"></i>التقويم
+</button>
+<button onclick="showSection('exam')" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition">
+<i class="fas fa-map-marker-alt ml-2"></i>موقع الامتحان
+</button>
+<button onclick="toggleAdminMode()" class="w-full text-right px-4 py-3 rounded-lg hover:bg-white/10 transition text-amber-400">
+<i class="fas fa-user-cog ml-2"></i>وضع المشرف
+</button>
+</div>
+</div>
+</nav>
+
+<main class="pt-20 pb-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
+
+<!-- Dashboard -->
+<section id="dashboard" class="section-content">
+<div class="mb-8">
+<h1 class="text-4xl font-bold mb-2 date-glow">أهلاً بك، طالبنا العزيز! 👋</h1>
+<p class="text-gray-400 text-lg">إليك نظرة عامة على نشاطاتك اليومية</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<div class="glass rounded-2xl p-6 hover:bg-white/10 transition-all duration-300">
+<div class="flex items-center justify-between mb-4">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+<i class="fas fa-clipboard-list text-xl"></i>
+</div>
+<span class="text-3xl font-bold" id="totalTasks">0</span>
+</div>
+<p class="text-gray-400 text-sm">إجمالي المهام</p>
+<div class="mt-3 h-1 bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:75%"></div></div>
+</div>
+<div class="glass rounded-2xl p-6 hover:bg-white/10 transition-all duration-300">
+<div class="flex items-center justify-between mb-4">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+<i class="fas fa-check-circle text-xl"></i>
+</div>
+<span class="text-3xl font-bold" id="completedTasks">0</span>
+</div>
+<p class="text-gray-400 text-sm">المهام المنجزة</p>
+<div class="mt-3 h-1 bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-green-500 rounded-full" id="completedBar" style="width:0%"></div></div>
+</div>
+<div class="glass rounded-2xl p-6 hover:bg-white/10 transition-all duration-300">
+<div class="flex items-center justify-between mb-4">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+<i class="fas fa-clock text-xl"></i>
+</div>
+<span class="text-3xl font-bold" id="pendingTasks">0</span>
+</div>
+<p class="text-gray-400 text-sm">المهام المعلقة</p>
+<div class="mt-3 h-1 bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-amber-500 rounded-full" id="pendingBar" style="width:0%"></div></div>
+</div>
+<div class="glass rounded-2xl p-6 hover:bg-white/10 transition-all duration-300">
+<div class="flex items-center justify-between mb-4">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+<i class="fas fa-percentage text-xl"></i>
+</div>
+<span class="text-3xl font-bold" id="progressPercent">0%</span>
+</div>
+<p class="text-gray-400 text-sm">نسبة الإنجاز</p>
+<div class="mt-3 h-1 bg-white/10 rounded-full overflow-hidden"><div class="h-full bg-purple-500 rounded-full" id="progressBar" style="width:0%"></div></div>
+</div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<div class="glass rounded-2xl p-6 text-center">
+<div class="mb-4"><i class="fas fa-clock text-4xl text-blue-400 mb-2"></i><h3 class="text-lg font-semibold text-gray-300">الوقت الحالي</h3></div>
+<div class="text-5xl font-bold mb-2 font-mono" id="digitalClock">00:00:00</div>
+<div class="text-gray-400" id="currentDate">---</div>
+</div>
+<div class="glass rounded-2xl p-6 text-center">
+<div class="mb-4"><i class="fas fa-moon text-4xl text-amber-400 mb-2"></i><h3 class="text-lg font-semibold text-gray-300">التاريخ الهجري</h3></div>
+<div class="text-3xl font-bold mb-2 text-amber-300" id="hijriDate">---</div>
+<div class="text-gray-400" id="hijriFullDate">---</div>
+</div>
+<div class="glass rounded-2xl p-6">
+<h3 class="text-lg font-semibold mb-4 text-gray-300"><i class="fas fa-bolt text-yellow-400 ml-2"></i>إجراءات سريعة</h3>
+<div class="space-y-3">
+<button onclick="showSection('tasks'); openAddTaskModal()" class="w-full glass hover:bg-white/10 p-3 rounded-xl flex items-center gap-3 transition">
+<div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fas fa-plus text-blue-400"></i></div>
+<span>إضافة مهمة جديدة</span>
+</button>
+<button onclick="showSection('exam')" class="w-full glass hover:bg-white/10 p-3 rounded-xl flex items-center gap-3 transition">
+<div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center"><i class="fas fa-map-marker-alt text-red-400"></i></div>
+<span>الذهاب لموقع الامتحان</span>
+</button>
+<button onclick="showSection('bot')" class="w-full glass hover:bg-white/10 p-3 rounded-xl flex items-center gap-3 transition">
+<div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center"><i class="fab fa-telegram text-green-400"></i></div>
+<span>استعراض محتوى البوت</span>
+</button>
+</div>
+</div>
+</div>
+
+<div class="glass rounded-2xl p-6">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-xl font-bold"><i class="fas fa-list-check text-blue-400 ml-2"></i>آخر المهام</h3>
+<button onclick="showSection('tasks')" class="text-blue-400 hover:text-blue-300 text-sm">عرض الكل <i class="fas fa-arrow-left mr-1"></i></button>
+</div>
+<div id="recentTasksList" class="space-y-3"><div class="text-center text-gray-500 py-8">لا توجد مهام حالياً</div></div>
+</div>
+</section>
+
+<!-- Tasks -->
+<section id="tasks" class="section-content hidden">
+<div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+<div><h1 class="text-3xl font-bold mb-2">📋 جدول المهام</h1><p class="text-gray-400">نظم مهامك الدراسية بسهولة وكفاءة</p></div>
+<button onclick="openAddTaskModal()" class="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-shadow shadow-lg shadow-blue-500/25"><i class="fas fa-plus"></i>إضافة مهمة جديدة</button>
+</div>
+
+<div class="glass rounded-2xl p-4 mb-6 flex flex-wrap gap-3">
+<button onclick="filterTasks('all')" class="filter-btn active px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm" data-filter="all">الكل</button>
+<button onclick="filterTasks('pending')" class="filter-btn px-4 py-2 rounded-lg hover:bg-white/10 transition text-sm" data-filter="pending"><i class="fas fa-clock ml-1 text-amber-400"></i>معلقة</button>
+<button onclick="filterTasks('completed')" class="filter-btn px-4 py-2 rounded-lg hover:bg-white/10 transition text-sm" data-filter="completed"><i class="fas fa-check ml-1 text-green-400"></i>منجزة</button>
+<button onclick="filterTasks('high')" class="filter-btn px-4 py-2 rounded-lg hover:bg-white/10 transition text-sm" data-filter="high"><i class="fas fa-flag ml-1 text-red-400"></i>أولوية عالية</button>
+<div class="mr-auto flex items-center gap-2 text-sm text-gray-400"><i class="fas fa-info-circle"></i>اسحب المهام لإعادة ترتيبها</div>
+</div>
+
+<div class="glass rounded-2xl p-6">
+<div id="tasksList" class="space-y-3"></div>
+<div id="emptyTasks" class="hidden text-center py-12">
+<div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4"><i class="fas fa-clipboard text-3xl text-gray-500"></i></div>
+<p class="text-gray-400 text-lg">لا توجد مهام مطابقة للفلتر المحدد</p>
+</div>
+</div>
+</section>
+
+<!-- Bot Content + Admin Controls -->
+<section id="bot" class="section-content hidden">
+<div class="flex flex-wrap items-center justify-between mb-8 gap-4">
+<div>
+<h1 class="text-3xl font-bold mb-2"><i class="fab fa-telegram text-blue-400 ml-2"></i>محتوى البوت التعليمي</h1>
+<p class="text-gray-400">جميع المواد والدروس المتوفرة في البوت</p>
+</div>
+<div id="adminBotControls" class="hidden flex gap-3">
+<button onclick="openAddSubjectModal()" class="bg-gradient-to-r from-blue-500 to-purple-600 px-5 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition">
+<i class="fas fa-plus"></i> إضافة مادة
+</button>
+<button onclick="openExamSettingsModal()" class="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition">
+<i class="fas fa-edit"></i> تعديل الامتحان
+</button>
+</div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="glass rounded-xl p-4 text-center"><div class="text-2xl font-bold text-blue-400" id="subjectsCount">0</div><div class="text-sm text-gray-400">مادة دراسية</div></div>
+<div class="glass rounded-xl p-4 text-center"><div class="text-2xl font-bold text-green-400" id="lessonsCount">0</div><div class="text-sm text-gray-400">درس متاح</div></div>
+<div class="glass rounded-xl p-4 text-center"><div class="text-2xl font-bold text-purple-400" id="filesCount">0</div><div class="text-sm text-gray-400">ملف PDF</div></div>
+<div class="glass rounded-xl p-4 text-center"><div class="text-2xl font-bold text-amber-400" id="testsCount">0</div><div class="text-sm text-gray-400">اختبار تدريبي</div></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="subjectsGrid"></div>
+</section>
+
+<!-- Calendar -->
+<section id="calendar" class="section-content hidden">
+<div class="mb-8"><h1 class="text-3xl font-bold mb-2"><i class="fas fa-calendar-alt text-amber-400 ml-2"></i>التقويم والتواريخ</h1><p class="text-gray-400">التاريخ الهجري والميلادي والمناسبات القادمة</p></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div class="glass rounded-2xl p-8 text-center">
+<div class="mb-6"><i class="fas fa-moon text-6xl text-amber-400 mb-4" style="animation:float 6s ease-in-out infinite;"></i><h2 class="text-2xl font-bold mb-2">التاريخ الهجري</h2></div>
+<div class="text-5xl font-bold text-amber-300 mb-2" id="calendarHijriDate">---</div>
+<div class="text-xl text-gray-300 mb-6" id="calendarHijriFull">---</div>
+<div class="grid grid-cols-3 gap-4 mt-6">
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">اليوم</div><div class="text-lg font-bold" id="hijriDayName">---</div></div>
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">الشهر</div><div class="text-lg font-bold" id="hijriMonth">---</div></div>
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">السنة</div><div class="text-lg font-bold" id="hijriYear">---</div></div>
+</div>
+</div>
+<div class="glass rounded-2xl p-8 text-center">
+<div class="mb-6"><i class="fas fa-sun text-6xl text-blue-400 mb-4" style="animation:pulse 3s infinite;"></i><h2 class="text-2xl font-bold mb-2">التاريخ الميلادي</h2></div>
+<div class="text-5xl font-bold text-blue-300 mb-2" id="calendarGregDate">---</div>
+<div class="text-xl text-gray-300 mb-6" id="calendarGregFull">---</div>
+<div class="grid grid-cols-3 gap-4 mt-6">
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">اليوم</div><div class="text-lg font-bold" id="gregDayName">---</div></div>
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">الشهر</div><div class="text-lg font-bold" id="gregMonth">---</div></div>
+<div class="glass rounded-xl p-3"><div class="text-sm text-gray-400">السنة</div><div class="text-lg font-bold" id="gregYear">---</div></div>
+</div>
+</div>
+</div>
+<div class="glass rounded-2xl p-6 mt-6">
+<h3 class="text-xl font-bold mb-4"><i class="fas fa-star text-yellow-400 ml-2"></i>المناسبات القادمة</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="upcomingEvents"></div>
+</div>
+</section>
+
+<!-- Exam -->
+<section id="exam" class="section-content hidden">
+<div class="mb-8"><h1 class="text-3xl font-bold mb-2"><i class="fas fa-map-marked-alt text-red-400 ml-2"></i>موقع الامتحان</h1><p class="text-gray-400">موقع قاعة الامتحان مع إمكانية الملاحة والوصول</p></div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+<div class="glass rounded-2xl p-6">
+<div class="flex items-center gap-4 mb-4"><div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center"><i class="fas fa-building text-red-400 text-xl"></i></div><div><h3 class="font-bold">المبنى</h3><p class="text-gray-400 text-sm">قاعة الامتحانات الرئيسية</p></div></div>
+<p class="text-lg font-semibold" id="examBuilding">مبنى كلية العلوم - الدور الثالث</p>
+</div>
+<div class="glass rounded-2xl p-6">
+<div class="flex items-center gap-4 mb-4"><div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center"><i class="fas fa-door-open text-blue-400 text-xl"></i></div><div><h3 class="font-bold">القاعة</h3><p class="text-gray-400 text-sm">رقم القاعة</p></div></div>
+<p class="text-lg font-semibold" id="examRoom">قاعة 302 - الشمالية</p>
+</div>
+<div class="glass rounded-2xl p-6">
+<div class="flex items-center gap-4 mb-4"><div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center"><i class="fas fa-clock text-green-400 text-xl"></i></div><div><h3 class="font-bold">الموعد</h3><p class="text-gray-400 text-sm">تاريخ ووقت الامتحان</p></div></div>
+<p class="text-lg font-semibold" id="examDateTime">الأحد القادم - 9:00 صباحاً</p>
+</div>
+</div>
+
+<div class="glass rounded-2xl p-4 mb-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-lg font-bold"><i class="fas fa-map text-red-400 ml-2"></i>الخريطة التفاعلية</h3>
+<div class="flex gap-2">
+<button onclick="getDirections()" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"><i class="fas fa-directions"></i>الاتجاهات</button>
+<button onclick="shareLocation()" class="glass hover:bg-white/10 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2"><i class="fas fa-share-alt"></i>مشاركة</button>
+</div>
+</div>
+<div id="examMap"></div>
+</div>
+
+<div class="glass rounded-2xl p-6">
+<h3 class="text-xl font-bold mb-4"><i class="fas fa-exclamation-triangle text-amber-400 ml-2"></i>تعليمات مهمة قبل الامتحان</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex items-start gap-3 p-3 rounded-xl bg-white/5"><div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-1"><span class="text-red-400 font-bold">1</span></div><div><h4 class="font-semibold mb-1">الوصول المبكر</h4><p class="text-gray-400 text-sm">يجب الوصول قبل موعد الامتحان بـ 30 دقيقة على الأقل</p></div></div>
+<div class="flex items-start gap-3 p-3 rounded-xl bg-white/5"><div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-1"><span class="text-blue-400 font-bold">2</span></div><div><h4 class="font-semibold mb-1">البطاقة الجامعية</h4><p class="text-gray-400 text-sm">إحضار البطاقة الجامعية أو الهوية الشخصية</p></div></div>
+<div class="flex items-start gap-3 p-3 rounded-xl bg-white/5"><div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0 mt-1"><span class="text-green-400 font-bold">3</span></div><div><h4 class="font-semibold mb-1">الأدوات المسموحة</h4><p class="text-gray-400 text-sm">قلم رصاص، ممحاة، مسطرة فقط - لا يوجد حاسبة</p></div></div>
+<div class="flex items-start gap-3 p-3 rounded-xl bg-white/5"><div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-1"><span class="text-purple-400 font-bold">4</span></div><div><h4 class="font-semibold mb-1">إغلاق الهواتف</h4><p class="text-gray-400 text-sm">إغلاق الهاتف الجوال تماماً ووضعه في الحقيبة</p></div></div>
+</div>
+</div>
+</section>
+</main>
+
+<!-- Task Modal -->
+<div id="taskModal" class="fixed inset-0 z-50 hidden">
+<div class="modal-overlay absolute inset-0" onclick="closeTaskModal()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+<div class="glass-strong rounded-2xl p-6" style="animation:slideUp 0.5s ease-out;">
+<div class="flex items-center justify-between mb-6"><h3 class="text-xl font-bold" id="modalTitle">إضافة مهمة جديدة</h3><button onclick="closeTaskModal()" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div>
+<form id="taskForm" onsubmit="saveTask(event)">
+<input type="hidden" id="taskId">
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">عنوان المهمة</label><input type="text" id="taskTitle" required class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="مثال: مراجعة الفصل الثالث في الرياضيات"></div>
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">الوصف (اختياري)</label><textarea id="taskDesc" rows="3" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition resize-none" placeholder="أضف تفاصيل إضافية..."></textarea></div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div><label class="block text-sm font-medium text-gray-300 mb-2">الأولوية</label><select id="taskPriority" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition"><option value="low">منخفضة</option><option value="medium" selected>متوسطة</option><option value="high">عالية</option></select></div>
+<div><label class="block text-sm font-medium text-gray-300 mb-2">تاريخ الاستحقاق</label><input type="date" id="taskDueDate" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition"></div>
+</div>
+<div class="mb-6"><label class="block text-sm font-medium text-gray-300 mb-2">المادة الدراسية</label><select id="taskSubject" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition"></select></div>
+<div class="flex gap-3"><button type="button" onclick="closeTaskModal()" class="flex-1 glass hover:bg-white/10 py-3 rounded-xl font-medium transition">إلغاء</button><button type="submit" class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 py-3 rounded-xl font-bold transition">حفظ المهمة</button></div>
+</form>
+</div>
+</div>
+</div>
+
+<!-- Admin: Add/Edit Subject Modal -->
+<div id="subjectEditorModal" class="fixed inset-0 z-50 hidden">
+<div class="modal-overlay absolute inset-0" onclick="closeSubjectEditor()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+<div class="glass-strong rounded-2xl p-6" style="animation:slideUp 0.5s ease-out;">
+<div class="flex items-center justify-between mb-6"><h3 class="text-xl font-bold" id="subjectEditorTitle">إضافة مادة جديدة</h3><button onclick="closeSubjectEditor()" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div>
+<form id="subjectForm" onsubmit="saveSubject(event)">
+<input type="hidden" id="subjectEditId">
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">اسم المادة</label><input type="text" id="subjectName" required class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="مثال: رياضيات"></div>
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">الوصف</label><input type="text" id="subjectDesc" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="وصف مختصر"></div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div><label class="block text-sm font-medium text-gray-300 mb-2">أيقونة (Font Awesome)</label><input type="text" id="subjectIcon" value="fa-book" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="fa-book"></div>
+<div><label class="block text-sm font-medium text-gray-300 mb-2">لون (مثال: from-blue-500 to-cyan-500)</label><input type="text" id="subjectColor" value="from-blue-500 to-cyan-500" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="from-blue-500 to-cyan-500"></div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div><label class="block text-sm font-medium text-gray-300 mb-2">عدد الدروس</label><input type="number" id="subjectLessons" value="10" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition"></div>
+<div><label class="block text-sm font-medium text-gray-300 mb-2">عدد الملفات</label><input type="number" id="subjectFiles" value="5" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition"></div>
+</div>
+<div class="flex gap-3"><button type="button" onclick="closeSubjectEditor()" class="flex-1 glass hover:bg-white/10 py-3 rounded-xl font-medium transition">إلغاء</button><button type="submit" class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 py-3 rounded-xl font-bold transition">حفظ المادة</button></div>
+</form>
+</div>
+</div>
+</div>
+
+<!-- Admin: Exam Settings Modal -->
+<div id="examSettingsModal" class="fixed inset-0 z-50 hidden">
+<div class="modal-overlay absolute inset-0" onclick="closeExamSettings()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+<div class="glass-strong rounded-2xl p-6" style="animation:slideUp 0.5s ease-out;">
+<div class="flex items-center justify-between mb-6"><h3 class="text-xl font-bold">تعديل بيانات الامتحان</h3><button onclick="closeExamSettings()" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div>
+<form id="examForm" onsubmit="saveExamSettings(event)">
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">اسم المبنى</label><input type="text" id="examBuildingInput" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="مبنى كلية العلوم - الدور الثالث"></div>
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">رقم القاعة</label><input type="text" id="examRoomInput" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="قاعة 302 - الشمالية"></div>
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">التاريخ والوقت</label><input type="text" id="examDateTimeInput" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition" placeholder="الأحد القادم - 9:00 صباحاً"></div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div><label class="block text-sm font-medium text-gray-300 mb-2">خط العرض</label><input type="number" step="any" id="examLat" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition" placeholder="24.7136"></div>
+<div><label class="block text-sm font-medium text-gray-300 mb-2">خط الطول</label><input type="number" step="any" id="examLng" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition" placeholder="46.6753"></div>
+</div>
+<div class="flex gap-3"><button type="button" onclick="closeExamSettings()" class="flex-1 glass hover:bg-white/10 py-3 rounded-xl font-medium transition">إلغاء</button><button type="submit" class="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 py-3 rounded-xl font-bold transition">حفظ التغييرات</button></div>
+</form>
+</div>
+</div>
+</div>
+
+<!-- Telegram Bot Modal (Admin only) -->
+<div id="telegramModal" class="fixed inset-0 z-50 hidden">
+<div class="modal-overlay absolute inset-0" onclick="closeTelegramModal()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+<div class="glass-strong rounded-2xl p-6" style="animation:slideUp 0.5s ease-out;">
+<div class="flex items-center justify-between mb-6"><h3 class="text-xl font-bold"><i class="fab fa-telegram text-blue-400 ml-2"></i>ربط البوت (للمشرف فقط)</h3><button onclick="closeTelegramModal()" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div>
+<div class="text-center mb-6"><div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mx-auto mb-4"><i class="fab fa-telegram text-4xl"></i></div><p class="text-gray-300">أدخل توكن البوت ومعرف المحادثة</p></div>
+<form onsubmit="connectBot(event)">
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">معرف البوت (Bot Token)</label><input type="text" id="botToken" required class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition text-left" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"></div>
+<div class="mb-4"><label class="block text-sm font-medium text-gray-300 mb-2">معرف المحادثة (Chat ID)</label><input type="text" id="chatId" class="w-full glass-input bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition text-left" placeholder="123456789"></div>
+<div class="mb-6 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"><p class="text-sm text-yellow-300"><i class="fas fa-info-circle ml-1"></i>يمكنك الحصول على Bot Token من @BotFather في تلجرام</p></div>
+<button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 py-3 rounded-xl font-bold transition telegram-btn"><i class="fab fa-telegram ml-2"></i>ربط البوت</button>
+</form>
+</div>
+</div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast fixed bottom-6 left-6 z-50 glass-strong rounded-xl px-6 py-4 flex items-center gap-3">
+<div id="toastIcon" class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center"><i class="fas fa-check text-green-400"></i></div>
+<span id="toastMessage" class="font-medium">تمت العملية بنجاح</span>
+</div>
+
+<script>
+// ============================================================
+// 1. DATA (persisted in localStorage)
+// ============================================================
+let tasks = JSON.parse(localStorage.getItem('studentTasks')) || [
+{ id: 1, title: 'مراجعة الفصل الثالث - الرياضيات', desc: 'حل تمارين الصفحة 45-50', priority: 'high', dueDate: '2026-06-20', subject: 'رياضيات', completed: false, createdAt: Date.now() },
+{ id: 2, title: 'كتابة موضوع تعبير', desc: 'موضوع: الصداقة الحقيقية', priority: 'medium', dueDate: '2026-06-22', subject: 'لغة عربية', completed: false, createdAt: Date.now()-1000 },
+{ id: 3, title: 'تحضير تجربة المختبر', desc: 'تجربة تحليل الماء', priority: 'high', dueDate: '2026-06-19', subject: 'كيمياء', completed: true, createdAt: Date.now()-2000 },
+{ id: 4, title: 'حفظ قصيدة النهر', desc: 'حفظ 10 أبيات', priority: 'low', dueDate: '2026-06-25', subject: 'لغة عربية', completed: false, createdAt: Date.now()-3000 }
+];
+
+let botSubjects = JSON.parse(localStorage.getItem('botSubjects')) || [
+{ id: 1, name: 'الرياضيات', icon: 'fa-square-root-alt', color: 'from-blue-500 to-cyan-500', lessons: 24, files: 12, description: 'جبر، هندسة، تفاضل، تكامل، إحصاء' },
+{ id: 2, name: 'الفيزياء', icon: 'fa-atom', color: 'from-purple-500 to-pink-500', lessons: 18, files: 8, description: 'ميكانيكا، كهرباء، مغناطيسية، ضوء' },
+{ id: 3, name: 'الكيمياء', icon: 'fa-flask', color: 'from-green-500 to-emerald-500', lessons: 20, files: 10, description: 'كيمياء عضوية، غير عضوية، تحليلية' },
+{ id: 4, name: 'الأحياء', icon: 'fa-dna', color: 'from-red-500 to-orange-500', lessons: 22, files: 9, description: 'تشريح، وظائف أعضاء، بيئة، وراثة' },
+{ id: 5, name: 'اللغة العربية', icon: 'fa-book-open', color: 'from-amber-500 to-yellow-500', lessons: 30, files: 15, description: 'نحو، صرف، بلاغة، أدب، قصة' },
+{ id: 6, name: 'اللغة الإنجليزية', icon: 'fa-language', color: 'from-indigo-500 to-blue-600', lessons: 28, files: 14, description: 'قواعد، مفردات، محادثة، قراءة، كتابة' },
+{ id: 7, name: 'التاريخ', icon: 'fa-landmark', color: 'from-amber-700 to-amber-900', lessons: 16, files: 7, description: 'تاريخ إسلامي، تاريخ حديث، حضارات' },
+{ id: 8, name: 'الجغرافيا', icon: 'fa-globe-asia', color: 'from-teal-500 to-cyan-600', lessons: 14, files: 6, description: 'جغرافيا طبيعية، بشرية، اقتصادية' },
+{ id: 9, name: 'التربية الإسلامية', icon: 'fa-mosque', color: 'from-emerald-600 to-green-700', lessons: 12, files: 5, description: 'فقه، حديث، توحيد، سيرة نبوية' }
+];
+
+let examSettings = JSON.parse(localStorage.getItem('examSettings')) || {
+building: 'مبنى كلية العلوم - الدور الثالث',
+room: 'قاعة 302 - الشمالية',
+datetime: 'الأحد القادم - 9:00 صباحاً',
+lat: 24.7136,
+lng: 46.6753
+};
+
+let isAdmin = false;
+const ADMIN_PASSWORD = 'admin123';
+
+// ============================================================
+// 2. DOM references & helpers
+// ============================================================
+function saveTasks() { localStorage.setItem('studentTasks', JSON.stringify(tasks)); }
+function saveBotSubjects() { localStorage.setItem('botSubjects', JSON.stringify(botSubjects)); }
+function saveExamSettings() { localStorage.setItem('examSettings', JSON.stringify(examSettings)); }
+
+function getSubjectNames() { return botSubjects.map(s => s.name); }
+
+// Populate subject dropdown in task modal
+function populateSubjectDropdown() {
+const sel = document.getElementById('taskSubject');
+const current = sel.value;
+sel.innerHTML = '<option value="عام">عام</option>' + botSubjects.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+if (current) sel.value = current;
+}
+
+// ============================================================
+// 3. Admin mode toggle
+// ============================================================
+function toggleAdminMode() {
+if (!isAdmin) {
+const pass = prompt('أدخل كلمة مرور المشرف:');
+if (pass === ADMIN_PASSWORD) {
+isAdmin = true;
+document.getElementById('adminBadge').classList.remove('hidden');
+document.getElementById('telegramConnectBtn').classList.remove('hidden');
+document.getElementById('adminBotControls').classList.remove('hidden');
+showToast('تم تفعيل وضع المشرف', 'success');
+} else {
+showToast('كلمة مرور خاطئة', 'error');
+}
+} else {
+isAdmin = false;
+document.getElementById('adminBadge').classList.add('hidden');
+document.getElementById('telegramConnectBtn').classList.add('hidden');
+document.getElementById('adminBotControls').classList.add('hidden');
+showToast('تم الخروج من وضع المشرف', 'success');
+}
+}
+
+// ============================================================
+// 4. Navigation
+// ============================================================
+function showSection(sectionId) {
+document.querySelectorAll('.section-content').forEach(s => s.classList.add('hidden'));
+document.getElementById(sectionId).classList.remove('hidden');
+document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+const navItem = document.getElementById('nav-' + sectionId);
+if (navItem) navItem.classList.add('active');
+document.getElementById('mobileMenu').classList.add('hidden');
+if (sectionId === 'exam') setTimeout(initMap, 100);
+window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function toggleMobileMenu() { document.getElementById('mobileMenu').classList.toggle('hidden'); }
+
+// ============================================================
+// 5. Clock & Hijri
+// ============================================================
+function updateClock() {
+const now = new Date();
+document.getElementById('digitalClock').textContent = now.toTimeString().slice(0,8);
+const days = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+document.getElementById('currentDate').textContent = days[now.getDay()]+'، '+now.getDate()+' '+months[now.getMonth()]+' '+now.getFullYear();
+updateHijriDate();
+}
+function updateHijriDate() {
+const now = new Date();
+const hijriMonths = ['محرم','صفر','ربيع الأول','ربيع الآخر','جمادى الأولى','جمادى الآخرة','رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'];
+const hijriDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const startOfYear = new Date(now.getFullYear(), 0, 1);
+const dayOfYear = Math.floor((now - startOfYear) / (1000*60*60*24));
+const hijriMonthIndex = Math.floor((dayOfYear % 354) / 29.5) % 12;
+const hijriDay = Math.floor((dayOfYear % 354) % 29.5) + 1;
+const hijriYear = Math.floor((now - new Date('622-07-16')) / (1000*60*60*24*354.367)) + 1 + 1447;
+const hijriDateStr = hijriDay+' '+hijriMonths[hijriMonthIndex]+' '+hijriYear+'هـ';
+document.getElementById('hijriDate').textContent = hijriDateStr;
+document.getElementById('hijriFullDate').textContent = hijriDays[now.getDay()]+'، '+hijriDateStr;
+document.getElementById('calendarHijriDate').textContent = hijriDateStr;
+document.getElementById('calendarHijriFull').textContent = hijriDays[now.getDay()]+'، '+hijriDateStr;
+document.getElementById('hijriDayName').textContent = hijriDays[now.getDay()];
+document.getElementById('hijriMonth').textContent = hijriMonths[hijriMonthIndex];
+document.getElementById('hijriYear').textContent = hijriYear+'هـ';
+const gregDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const gregMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+document.getElementById('calendarGregDate').textContent = now.getDate()+' '+gregMonths[now.getMonth()]+' '+now.getFullYear();
+document.getElementById('calendarGregFull').textContent = gregDays[now.getDay()]+'، '+now.getDate()+' '+gregMonths[now.getMonth()]+' '+now.getFullYear()+'م';
+document.getElementById('gregDayName').textContent = gregDays[now.getDay()];
+document.getElementById('gregMonth').textContent = gregMonths[now.getMonth()];
+document.getElementById('gregYear').textContent = now.getFullYear()+'م';
+}
+setInterval(updateClock, 1000);
+
+// ============================================================
+// 6. Tasks
+// ============================================================
+let currentFilter = 'all';
+
+function renderTasks() {
+const tasksList = document.getElementById('tasksList');
+const recentTasksList = document.getElementById('recentTasksList');
+const emptyTasks = document.getElementById('emptyTasks');
+let filtered = tasks;
+if (currentFilter === 'pending') filtered = tasks.filter(t => !t.completed);
+else if (currentFilter === 'completed') filtered = tasks.filter(t => t.completed);
+else if (currentFilter === 'high') filtered = tasks.filter(t => t.priority === 'high');
+
+if (filtered.length === 0) { tasksList.innerHTML = ''; emptyTasks.classList.remove('hidden'); }
+else { emptyTasks.classList.add('hidden'); tasksList.innerHTML = filtered.map(task => createTaskHTML(task)).join(''); }
+
+const recent = tasks.slice(0, 3);
+recentTasksList.innerHTML = recent.length ? recent.map(t => createTaskHTML(t, true)).join('') : '<div class="text-center text-gray-500 py-8">لا توجد مهام حالياً</div>';
+updateStats();
+}
+
+function createTaskHTML(task, isRecent) {
+const priorityClass = { high: 'priority-high', medium: 'priority-medium', low: 'priority-low' }[task.priority];
+const priorityText = { high: 'عالية', medium: 'متوسطة', low: 'منخفضة' }[task.priority];
+const priorityIcon = { high: 'fa-flag', medium: 'fa-exclamation-circle', low: 'fa-arrow-down' }[task.priority];
+const completedClass = task.completed ? 'opacity-50 line-through' : '';
+return `<div class="task-item glass rounded-xl p-4 flex items-center gap-4 ${completedClass}" data-id="${task.id}">
+<div class="flex-shrink-0 cursor-move text-gray-500 hover:text-gray-300"><i class="fas fa-grip-vertical"></i></div>
+<input type="checkbox" class="custom-checkbox flex-shrink-0" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2 mb-1"><span class="font-semibold truncate">${task.title}</span><span class="${priorityClass} text-xs px-2 py-0.5 rounded-full text-white flex items-center gap-1"><i class="fas ${priorityIcon} text-xs"></i>${priorityText}</span></div>
+${task.desc ? `<p class="text-gray-400 text-sm truncate">${task.desc}</p>` : ''}
+<div class="flex items-center gap-3 mt-2 text-xs text-gray-500"><span><i class="fas fa-book ml-1"></i>${task.subject}</span>${task.dueDate ? `<span><i class="fas fa-calendar ml-1"></i>${task.dueDate}</span>` : ''}</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<button onclick="editTask(${task.id})" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-blue-400 transition"><i class="fas fa-edit"></i></button>
+<button onclick="deleteTask(${task.id})" class="w-8 h-8 rounded-lg hover:bg-red-500/20 flex items-center justify-center text-red-400 transition"><i class="fas fa-trash"></i></button>
+</div>
+</div>`;
+}
+
+function initSortable() {
+const el = document.getElementById('tasksList');
+new Sortable(el, { animation: 150, handle: '.fa-grip-vertical', ghostClass: 'dragging',
+onEnd: function() {
+const newOrder = [];
+el.querySelectorAll('.task-item').forEach(item => {
+const id = parseInt(item.dataset.id);
+const t = tasks.find(tk => tk.id === id);
+if (t) newOrder.push(t);
+});
+tasks = newOrder; saveTasks(); showToast('تم إعادة ترتيب المهام', 'success');
+}
+});
+}
+
+function openAddTaskModal() {
+document.getElementById('modalTitle').textContent = 'إضافة مهمة جديدة';
+document.getElementById('taskForm').reset();
+document.getElementById('taskId').value = '';
+document.getElementById('taskDueDate').valueAsDate = new Date();
+populateSubjectDropdown();
+document.getElementById('taskModal').classList.remove('hidden');
+}
+function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
+function editTask(id) {
+const t = tasks.find(tk => tk.id === id);
+if (!t) return;
+document.getElementById('modalTitle').textContent = 'تعديل المهمة';
+document.getElementById('taskId').value = t.id;
+document.getElementById('taskTitle').value = t.title;
+document.getElementById('taskDesc').value = t.desc || '';
+document.getElementById('taskPriority').value = t.priority;
+document.getElementById('taskDueDate').value = t.dueDate || '';
+populateSubjectDropdown();
+document.getElementById('taskSubject').value = t.subject;
+document.getElementById('taskModal').classList.remove('hidden');
+}
+function saveTask(e) {
+e.preventDefault();
+const id = document.getElementById('taskId').value;
+const title = document.getElementById('taskTitle').value;
+const desc = document.getElementById('taskDesc').value;
+const priority = document.getElementById('taskPriority').value;
+const dueDate = document.getElementById('taskDueDate').value;
+const subject = document.getElementById('taskSubject').value;
+if (id) {
+const t = tasks.find(tk => tk.id === parseInt(id));
+if (t) { t.title = title; t.desc = desc; t.priority = priority; t.dueDate = dueDate; t.subject = subject; showToast('تم تعديل المهمة', 'success'); }
+} else {
+tasks.unshift({ id: Date.now(), title, desc, priority, dueDate, subject, completed: false, createdAt: Date.now() });
+showToast('تم إضافة المهمة', 'success');
+}
+saveTasks(); renderTasks(); closeTaskModal();
+}
+function toggleTask(id) {
+const t = tasks.find(tk => tk.id === id);
+if (t) { t.completed = !t.completed; saveTasks(); renderTasks(); showToast(t.completed ? 'تم إنجاز المهمة!' : 'تم إرجاع المهمة', 'success'); }
+}
+function deleteTask(id) {
+if (confirm('هل أنت متأكد؟')) { tasks = tasks.filter(t => t.id !== id); saveTasks(); renderTasks(); showToast('تم حذف المهمة', 'success'); }
+}
+function filterTasks(filter) {
+currentFilter = filter;
+document.querySelectorAll('.filter-btn').forEach(btn => {
+btn.classList.remove('active', 'bg-white/10');
+if (btn.dataset.filter === filter) btn.classList.add('active', 'bg-white/10');
+});
+renderTasks();
+}
+function updateStats() {
+const total = tasks.length, completed = tasks.filter(t => t.completed).length, pending = total - completed;
+const percent = total > 0 ? Math.round((completed/total)*100) : 0;
+document.getElementById('totalTasks').textContent = total;
+document.getElementById('completedTasks').textContent = completed;
+document.getElementById('pendingTasks').textContent = pending;
+document.getElementById('progressPercent').textContent = percent+'%';
+document.getElementById('completedBar').style.width = total > 0 ? (completed/total*100)+'%' : '0%';
+document.getElementById('pendingBar').style.width = total > 0 ? (pending/total*100)+'%' : '0%';
+document.getElementById('progressBar').style.width = percent+'%';
+}
+
+// ============================================================
+// 7. Bot Subjects (full CRUD for admin)
+// ============================================================
+function renderBotContent() {
+const grid = document.getElementById('subjectsGrid');
+grid.innerHTML = botSubjects.map(s =>
+`<div class="bot-card glass rounded-2xl p-6 ${isAdmin ? 'cursor-pointer' : ''}" onclick="${isAdmin ? `editSubject(${s.id})` : `openSubjectModal(${s.id})`}">
+<div class="flex items-start justify-between mb-4">
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center"><i class="fas ${s.icon} text-2xl text-white"></i></div>
+<span class="glass px-3 py-1 rounded-full text-xs">${s.lessons} درس</span>
+</div>
+<h3 class="text-xl font-bold mb-2">${s.name}</h3>
+<p class="text-gray-400 text-sm mb-4">${s.description || ''}</p>
+<div class="flex items-center gap-4 text-sm text-gray-500">
+<span><i class="fas fa-file-pdf ml-1 text-red-400"></i>${s.files} ملف</span>
+<span><i class="fas fa-play-circle ml-1 text-blue-400"></i>${s.lessons} درس</span>
+${isAdmin ? `<span class="text-amber-400 text-xs"><i class="fas fa-edit"></i> تعديل</span>` : ''}
+</div>
+</div>`
+).join('');
+document.getElementById('subjectsCount').textContent = botSubjects.length;
+document.getElementById('lessonsCount').textContent = botSubjects.reduce((a,b) => a + b.lessons, 0);
+document.getElementById('filesCount').textContent = botSubjects.reduce((a,b) => a + b.files, 0);
+document.getElementById('testsCount').textContent = botSubjects.length * 2; // fake
+}
+
+function openAddSubjectModal() {
+document.getElementById('subjectEditorTitle').textContent = 'إضافة مادة جديدة';
+document.getElementById('subjectForm').reset();
+document.getElementById('subjectEditId').value = '';
+document.getElementById('subjectEditorModal').classList.remove('hidden');
+}
+function editSubject(id) {
+const s = botSubjects.find(b => b.id === id);
+if (!s) return;
+document.getElementById('subjectEditorTitle').textContent = 'تعديل المادة';
+document.getElementById('subjectEditId').value = s.id;
+document.getElementById('subjectName').value = s.name;
+document.getElementById('subjectDesc').value = s.description || '';
+document.getElementById('subjectIcon').value = s.icon;
+document.getElementById('subjectColor').value = s.color;
+document.getElementById('subjectLessons').value = s.lessons;
+document.getElementById('subjectFiles').value = s.files;
+document.getElementById('subjectEditorModal').classList.remove('hidden');
+}
+function closeSubjectEditor() { document.getElementById('subjectEditorModal').classList.add('hidden'); }
+function saveSubject(e) {
+e.preventDefault();
+const id = document.getElementById('subjectEditId').value;
+const name = document.getElementById('subjectName').value.trim();
+const description = document.getElementById('subjectDesc').value.trim();
+const icon = document.getElementById('subjectIcon').value.trim();
+const color = document.getElementById('subjectColor').value.trim();
+const lessons = parseInt(document.getElementById('subjectLessons').value) || 0;
+const files = parseInt(document.getElementById('subjectFiles').value) || 0;
+if (!name) return showToast('الاسم مطلوب', 'error');
+if (id) {
+const s = botSubjects.find(b => b.id === parseInt(id));
+if (s) { s.name = name; s.description = description; s.icon = icon; s.color = color; s.lessons = lessons; s.files = files; }
+showToast('تم تعديل المادة', 'success');
+} else {
+botSubjects.push({ id: Date.now(), name, description, icon, color, lessons, files });
+showToast('تم إضافة المادة', 'success');
+}
+saveBotSubjects(); renderBotContent(); closeSubjectEditor();
+}
+
+function deleteSubject(id) {
+if (confirm('حذف المادة؟')) { botSubjects = botSubjects.filter(s => s.id !== id); saveBotSubjects(); renderBotContent(); showToast('تم الحذف', 'success'); }
+}
+
+function openSubjectModal(id) {
+const s = botSubjects.find(b => b.id === id);
+if (!s) return;
+// عرض تفاصيل المادة (للطالب)
+const lessonsHTML = Array.from({ length: Math.min(s.lessons, 10) }, (_, i) =>
+`<div class="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition">
+<div class="w-10 h-10 rounded-lg ${i%3===0?'bg-red-500/20':'bg-blue-500/20'} flex items-center justify-center"><i class="fas ${i%3===0?'fa-file-pdf text-red-400':'fa-play text-blue-400'}"></i></div>
+<div class="flex-1"><h4 class="font-medium text-sm">الدرس ${i+1} - ${s.name}</h4><p class="text-gray-500 text-xs">${Math.floor(Math.random()*20+10)} دقيقة</p></div>
+<button class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-gray-400"><i class="fas fa-download"></i></button>
+</div>`
+).join('');
+const modalHTML = `<div id="subjectModal" class="fixed inset-0 z-50">
+<div class="modal-overlay absolute inset-0" onclick="closeSubjectModal()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
+<div class="glass-strong rounded-2xl p-6" style="animation:slideUp 0.5s ease-out; max-height:80vh; overflow-y:auto;">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center"><i class="fas ${s.icon} text-xl text-white"></i></div><div><h3 class="text-xl font-bold">${s.name}</h3><p class="text-gray-400 text-sm">${s.lessons} درس متاح</p></div></div>
+<button onclick="closeSubjectModal()" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center"><i class="fas fa-times"></i></button>
+</div>
+<div class="space-y-2">${lessonsHTML}</div>
+${isAdmin ? `<div class="mt-4 flex gap-2"><button onclick="closeSubjectModal(); deleteSubject(${s.id})" class="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm">حذف المادة</button></div>` : ''}
+</div>
+</div>
+</div>`;
+document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+function closeSubjectModal() { const m = document.getElementById('subjectModal'); if (m) m.remove(); }
+
+// ============================================================
+// 8. Exam Settings (Admin)
+// ============================================================
+function openExamSettingsModal() {
+document.getElementById('examBuildingInput').value = examSettings.building;
+document.getElementById('examRoomInput').value = examSettings.room;
+document.getElementById('examDateTimeInput').value = examSettings.datetime;
+document.getElementById('examLat').value = examSettings.lat;
+document.getElementById('examLng').value = examSettings.lng;
+document.getElementById('examSettingsModal').classList.remove('hidden');
+}
+function closeExamSettings() { document.getElementById('examSettingsModal').classList.add('hidden'); }
+function saveExamSettings(e) {
+e.preventDefault();
+examSettings.building = document.getElementById('examBuildingInput').value.trim() || examSettings.building;
+examSettings.room = document.getElementById('examRoomInput').value.trim() || examSettings.room;
+examSettings.datetime = document.getElementById('examDateTimeInput').value.trim() || examSettings.datetime;
+examSettings.lat = parseFloat(document.getElementById('examLat').value) || examSettings.lat;
+examSettings.lng = parseFloat(document.getElementById('examLng').value) || examSettings.lng;
+saveExamSettings();
+updateExamUI();
+if (map) {
+map.setView([examSettings.lat, examSettings.lng], 15);
+if (examMarker) {
+examMarker.setLatLng([examSettings.lat, examSettings.lng]);
+examMarker.bindPopup(`<div style="text-align:center;font-family:Tajawal;"><h3 style="font-weight:bold;">قاعة الامتحان</h3><p>${examSettings.building}</p><p>${examSettings.room}</p></div>`);
+}
+}
+closeExamSettings();
+showToast('تم تحديث بيانات الامتحان', 'success');
+}
+function updateExamUI() {
+document.getElementById('examBuilding').textContent = examSettings.building;
+document.getElementById('examRoom').textContent = examSettings.room;
+document.getElementById('examDateTime').textContent = examSettings.datetime;
+}
+
+// ============================================================
+// 9. Map
+// ============================================================
+let map = null, examMarker = null;
+function initMap() {
+if (map) return;
+map = L.map('examMap').setView([examSettings.lat, examSettings.lng], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+const customIcon = L.divIcon({
+className: 'custom-marker',
+html: `<div style="background:linear-gradient(135deg,#ef4444,#dc2626);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 4px 12px rgba(239,68,68,0.4);"><i class="fas fa-graduation-cap text-white"></i></div>`,
+iconSize: [40,40], iconAnchor: [20,40]
+});
+examMarker = L.marker([examSettings.lat, examSettings.lng], { icon: customIcon }).addTo(map);
+examMarker.bindPopup(`<div style="text-align:center;font-family:Tajawal;"><h3 style="font-weight:bold;">قاعة الامتحان</h3><p>${examSettings.building}</p><p>${examSettings.room}</p></div>`).openPopup();
+}
+function getDirections() { window.open(`https://www.google.com/maps/dir/?api=1&destination=${examSettings.lat},${examSettings.lng}`, '_blank'); }
+function shareLocation() {
+if (navigator.share) navigator.share({ title: 'موقع الامتحان', text: `${examSettings.building} - ${examSettings.room}`, url: `https://www.google.com/maps?q=${examSettings.lat},${examSettings.lng}` });
+else showToast('تم نسخ الرابط', 'success');
+}
+
+// ============================================================
+// 10. Telegram Bot (Admin only)
+// ============================================================
+function connectTelegram() {
+if (!isAdmin) { showToast('يجب تفعيل وضع المشرف أولاً', 'error'); return; }
+document.getElementById('telegramModal').classList.remove('hidden');
+}
+function closeTelegramModal() { document.getElementById('telegramModal').classList.add('hidden'); }
+function connectBot(e) {
+e.preventDefault();
+const token = document.getElementById('botToken').value.trim();
+const chatId = document.getElementById('chatId').value.trim();
+localStorage.setItem('telegramBotToken', token);
+localStorage.setItem('telegramChatId', chatId);
+closeTelegramModal();
+showToast('تم ربط البوت بنجاح!', 'success');
+if (token && chatId) {
+fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ chat_id: chatId, text: '✅ تم ربط البوت بنجاح!\n\nمرحباً بك في منصّة البوت الرّاسِخون.\nسيتم إرسال إشعارات المهام والتذكيرات هنا.' })
+}).catch(() => {});
+}
+}
+
+// ============================================================
+// 11. Upcoming Events
+// ============================================================
+const upcomingEventsData = [
+{ title: 'امتحان منتصف الفصل', date: '2026-06-25', type: 'exam', icon: 'fa-file-alt' },
+{ title: 'إجازة عيد الأضحى', date: '2026-07-05', type: 'holiday', icon: 'fa-star' },
+{ title: 'آخر يوم دراسي', date: '2026-07-15', type: 'school', icon: 'fa-graduation-cap' },
+{ title: 'امتحانات نهاية العام', date: '2026-07-20', type: 'exam', icon: 'fa-pencil-alt' }
+];
+function renderUpcomingEvents() {
+const container = document.getElementById('upcomingEvents');
+const typeColors = { exam: 'text-red-400 bg-red-500/10 border-red-500/20', holiday: 'text-green-400 bg-green-500/10 border-green-500/20', school: 'text-blue-400 bg-blue-500/10 border-blue-500/20' };
+container.innerHTML = upcomingEventsData.map(e => {
+const days = Math.ceil((new Date(e.date) - new Date()) / (1000*60*60*24));
+return `<div class="glass rounded-xl p-4 border ${typeColors[e.type]}"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg flex items-center justify-center ${typeColors[e.type].split(' ')[1]}"><i class="fas ${e.icon}"></i></div><div><h4 class="font-bold">${e.title}</h4><p class="text-sm opacity-80">${e.date}</p></div></div><div class="mt-2 text-sm">${days > 0 ? 'متبقي '+days+' يوم' : 'اليوم!'}</div></div>`;
+}).join('');
+}
+
+// ============================================================
+// 12. Toast & init
+// ============================================================
+function showToast(msg, type='success') {
+const t = document.getElementById('toast'), m = document.getElementById('toastMessage'), ic = document.getElementById('toastIcon');
+m.textContent = msg;
+ic.className = 'w-8 h-8 rounded-full flex items-center justify-center ' + (type === 'success' ? 'bg-green-500/20' : 'bg-red-500/20');
+ic.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check text-green-400' : 'fa-exclamation text-red-400'}"></i>`;
+t.classList.add('show');
+setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// 13. Telegram WebApp integration (mini app)
+// ============================================================
+if (window.Telegram && window.Telegram.WebApp) {
+const tg = window.Telegram.WebApp;
+tg.expand(); // توسيع التطبيق لملء الشاشة
+tg.ready(); // إعلام تلجرام بأن التطبيق جاهز
+// تغيير الثيم تبعاً لإعدادات تلجرام
+if (tg.colorScheme === 'dark') {
+document.body.style.background = '#0f172a';
+} else {
+document.body.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)';
+}
+// زر الإغلاق
+tg.MainButton.setText('إغلاق التطبيق');
+tg.MainButton.onClick(() => tg.close());
+tg.MainButton.show();
+// إرسال بيانات المستخدم (اختياري)
+console.log('Telegram WebApp initialized', tg.initDataUnsafe);
+}
+
+// ============================================================
+// 14. Final init
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+updateClock();
+renderTasks();
+renderBotContent();
+renderUpcomingEvents();
+updateExamUI();
+initSortable();
+populateSubjectDropdown();
+document.getElementById('taskDueDate').valueAsDate = new Date();
+// Restore admin state from session (optional)
+if (localStorage.getItem('adminSession') === 'true') {
+isAdmin = true;
+document.getElementById('adminBadge').classList.remove('hidden');
+document.getElementById('telegramConnectBtn').classList.remove('hidden');
+document.getElementById('adminBotControls').classList.remove('hidden');
+}
+// إذا كان في تلجرام، نعرض زر الربط فقط للمشرف
+});
+</script>
+</body>
+</html>
